@@ -17,7 +17,7 @@ $manifest = {
   "locked" => "",
 }
 
-DEFAULT_LOCK_MESSAGE = "Update in progress. Try again later."
+DEFAULT_LOCK_MESSAGE = "The remote repository is locked. Try again later."
 
 $manifest.merge!(JSON.load(IO.read("catflap.json"))) if FileTest.exists?("catflap.json")
 
@@ -35,33 +35,36 @@ OptionParser.new do |opts|
   opts.on("--rsyncUrl URL", String, "Set/update rsync url") do |v|
     $manifest["rsyncUrl"] = v
   end
-  opts.on("--ignoreCase true/false", [:true, :false], "Ignore case when syncing (requires serverside rsync patch)") do |v|
+  opts.on("--[no-]ignoreCase", "Ignore case when syncing (requires serverside rsync patch)") do |v|
     $manifest["ignoreCase"] = v
   end
-  opts.on("--fuzzy true/false", [:true, :false], "Do fuzzy matching on the client (read rsync manpage!)") do |v|
+  opts.on("--[no-]ignoreExisting", "Skip existing top-level items when syncing") do |v|
+    $manifest["ignoreExisting"] = v
+  end
+  opts.on("--[no-]fuzzy", "Do fuzzy matching on the client (read rsync manpage!)") do |v|
     $manifest["fuzzy"] = v
   end
   opts.on("--textColor COLOR", String, "Set/update text color as hexadecimal notation") do |v|
     $manifest["textColor"] = v
   end
-  opts.on("--warnWhenSetupWithUntracked true/false", ["true", "false"], "Warn new clients when setting up in a directory that " +
+  opts.on("--[no-]warnWhenSetupWithUntracked", "Warn new clients when setting up in a directory that " +
       "already contains data not in the manifest") do |v|
     $manifest["warnWhenSetupWithUntracked"] = v
   end
 
   opts.on("--runActionExecute EXEPATH", String, "Run button executable name") do |v|
-    $manifest["runAction"] ||= {}
+    $manifest["runAction"] ||= {"name" => "", "execute" => "", "arguments" => ""}
     $manifest["runAction"]["execute"] = v
   end
   opts.on("--runActionArguments ARGS", String, "Run button executable arguments") do |v|
-    $manifest["runAction"] ||= {}
+    $manifest["runAction"] ||= {"name" => "", "execute" => "", "arguments" => ""}
     $manifest["runAction"]["arguments"] = v
   end
   opts.on("--runActionName NAME", String, "Run button label") do |v|
-    $manifest["runAction"] ||= {}
+    $manifest["runAction"] ||= {"name" => "", "execute" => "", "arguments" => ""}
     $manifest["runAction"]["name"] = v
   end
-  opts.on("--runActionAllowOutdated true/false", [:true, :false], "Allow clicking the run button even when not synced") do |v|
+  opts.on("--[no-]runActionAllowOutdated", "Allow clicking the run button even when not synced") do |v|
     $manifest["runActionAllowOutdated"] = v
   end
   opts.on("--runActionClear", String, "Remove the current run action") do
@@ -73,22 +76,27 @@ OptionParser.new do |opts|
     $manifest["revision"] = v
   end
 
+  opts.on("-v", "--version", "Show version") do
+    puts Catflap::VERSION
+    exit
+  end
+
   opts.separator ""
   opts.separator "Command is one of:"
-  opts.separator " status     - displays repository status (default)"
-  opts.separator " lock       - lock the repository to prevent clients from getting data"
-  opts.separator " unlock     - unlock the repository"
-  opts.separator " refresh    - refreshes the manifest for items you have changed"
   opts.separator " init       - create a new repository in the current directory"
+  opts.separator " status     - displays repository status (default)"
+  opts.separator " refresh    - refreshes the manifest for items you have changed"
   opts.separator " add        - add items to sync"
   opts.separator " rm         - remove items from the manifest"
   opts.separator " delete     - remove items and mark them to be deleted from clients"
+  opts.separator " lock       - lock the repository to prevent clients from getting data"
+  opts.separator " unlock     - unlock the repository"
   opts.separator " touch      - force a specific sync item to update on all clients"
   opts.separator ""
-  opts.separator "Give files/directories to add/remove as extra arguments."
+  opts.separator "Give files/directories to add/rm/delete as extra arguments."
   opts.separator "Only items in the current directory are supported by this utility."
   opts.separator ""
-  opts.separator "Syntax: file  directory/  file:flags  directory:flags"
+  opts.separator "Syntax for items: file  directory/  file:flags  directory/:flags"
   opts.separator "  Pay close attention to the trailing slash for directories!".light_magenta
   opts.separator ""
 
@@ -124,7 +132,7 @@ case $command
     keys_maxlen = keys.map(&:size).max
     keys.each do |xx|
       next if !$manifest[xx] || $manifest[xx] == "false" || $manifest[xx] == ""
-      $stderr.puts (" %-#{keys_maxlen}s: %s" % [xx, $manifest[xx]]).light_black
+      $stderr.puts (" %-#{keys_maxlen}s: %s" % [xx, $manifest[xx]])
     end
     $stderr.puts ""
 
@@ -132,15 +140,20 @@ case $command
 
     max_filewidth = $manifest["sync"].map {|sync| sync["name"].size }.max
 
+    $stderr.puts((" %-7s %-#{screen_width - 50}s %13s  %24s " % [
+      "PIifr", "sync", "size", "mtime"
+    ]).light_white)
+    $stderr.puts((" " + ("-" * (screen_width - 2))).light_white)
+
     $manifest["sync"].each do |sync|
       flagstr = case sync["type"]
         when "rsync", "", nil
-          (sync["purge"] ? "P" : "-") +
-            (sync["ignoreExisting"] ? "i" : "-") +
-            (sync["mode"] == "replace" ? "r" : "-") +
-            (sync["fuzzy"] ? "f" : "-") +
-            (sync["ignoreCase"] ? "I" : "-") +
-            ""
+          (sync["purge"] == true || ($manifest["purge"] == true && sync["purge"].nil?) ? "P" : "-") +
+          (sync["ignoreCase"] == true || ($manifest["ignoreCase"] == true && sync["ignoreCase"].nil?) ? "I" : "-") +
+          (sync["ignoreExisting"] == true || ($manifest["ignoreExisting"] == true && sync["ignoreExisting"].nil?) ? "i" : "-") +
+          (sync["fuzzy"] == true || ($manifest["fuzzy"] == true && sync["fuzzy"].nil?) ? "f" : "-") +
+          (sync["mode"] == "replace" ? "r" : "-") +
+          ""
         when "delete"
           "DELETE "
         else
@@ -156,7 +169,7 @@ case $command
       sizestr = sync["size"] ? Filesize.new(sync["size"]).pretty : ""
       timestr = sync["mtime"] ? DateTime.parse(sync["mtime"]).strftime("%c") : ""
 
-      text = " %-7s %-#{screen_width - 50}s %13s  %24s" % [
+      text = " %-7s %-#{screen_width - 50}s %13s  %24s " % [
         flagstr, filestr, sizestr, timestr
       ]
 
@@ -180,7 +193,7 @@ case $command
       sanity_check_sync sync
     end
 
-    $stderr.puts " " + ("-" * (screen_width - 2)).light_black
+    $stderr.puts((" " + ("-" * (screen_width - 2))).light_white)
 
     total_size = Filesize.new($manifest["sync"].map {|x|
         x["size"]}.compact.map(&:to_i).inject(0) {|a,b| a + b}
@@ -188,12 +201,7 @@ case $command
 
     total_fileinfo = "#{$manifest["sync"].size} synced items"
     text = " %7s %-#{screen_width - 45}s %-37s" % ["", total_fileinfo, total_size]
-    $stderr.puts text.light_black
-
-    if $manifest["locked"] != ""
-      $stderr.puts "\n"
-      $stderr.puts "Repository is currently locked.".red
-    end
+    $stderr.puts text.light_white
 
   when "lock"
     $manifest["locked"] = DEFAULT_LOCK_MESSAGE
@@ -308,10 +316,15 @@ if $manifest["locked"] == ""
   end
 
   $manifest["locked"] = DEFAULT_LOCK_MESSAGE if autolock
+
+else
+  $stderr.puts "\n"
+  $stderr.puts "Repository is currently locked.".red
 end
 
 if FileTest.exists?("catflap.json") && $manifest.hash != $manifest_original_hash
     $manifest["revision"] += 1 if $manifest["revision"].is_a?(Integer)
     File.open("catflap.json", "w") {|f| f.write(JSON.pretty_generate($manifest))}
-    $stderr.puts "Manifest written.".light_black
+    $stderr.puts ""
+    $stderr.puts "Manifest written.".green
 end
