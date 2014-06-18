@@ -5,7 +5,7 @@ require 'optparse'
 require 'json'
 require 'colorize'
 require 'filesize'
-require 'terminfo'
+require 'io/console'
 
 include Catflap
 
@@ -136,7 +136,7 @@ case $command
     end
     $stderr.puts ""
 
-    screen_width = TermInfo.screen_width
+    screen_width = IO.console.winsize[1]
 
     max_filewidth = $manifest["sync"].map {|sync| sync["name"].size }.max
 
@@ -197,10 +197,10 @@ case $command
 
     total_size = Filesize.new($manifest["sync"].map {|x|
         x["size"]}.compact.map(&:to_i).inject(0) {|a,b| a + b}
-      ).pretty + " in manifest"
+      ).pretty
 
     total_fileinfo = "#{$manifest["sync"].size} synced items"
-    text = " %7s %-#{screen_width - 45}s %-37s" % ["", total_fileinfo, total_size]
+    text = " %7s %-#{screen_width - 50}s %13s  %-24s" % ["", total_fileinfo, total_size, "in manifest"]
     $stderr.puts text.light_white
 
   when "lock"

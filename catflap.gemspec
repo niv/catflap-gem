@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["n@e-ix.net"]
   spec.summary       = %q{Companion management helper to Catflap Updater UI.}
   spec.description   = ""
-  spec.homepage      = ""
+  spec.homepage      = "https://github.com/niv/catflap"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($/)
@@ -23,5 +23,6 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency "colorize", '0.7.3'
   spec.add_runtime_dependency "filesize", '0.0.3'
-  spec.add_runtime_dependency "ruby-terminfo", '0.1.1'
+
+  spec.required_ruby_version = '>= 1.9.3'
 end
