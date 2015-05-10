@@ -31,21 +31,21 @@ module Catflap
   end
 
   def update_sync_item baseDir, obj, flags = nil
-    current = $manifest["sync"].select {|s| s["name"] == obj}
+    current = $manifest["sync"].find {|s| s["name"] == obj}
 
-    sync = if current && current.size > 0
-      current[0].dup
+    sync = if current
+      current.dup
     else
       {
-        "name"  => obj
+        "name"  => obj,
+        "revision" => 1
       }
     end
 
     if File.directory?(baseDir + obj)
-      all = Find.find(baseDir + obj)
+      all = Find.find(baseDir + obj).reject {|x| x =~ /\.rsyncsums$/ }
 
-      files = all.
-          reject {|x| File.directory?(x) }
+      files = all.reject {|x| File.directory?(x) }
 
       sync["size"] = files.map{|x| File.size(x) }.inject(0, :+)
       sync["count"] = files.size
@@ -77,6 +77,10 @@ module Catflap
     end
 
     sync.delete("csize")
+
+    if current && sync != current
+      sync["revision"] += 1
+    end
 
     sync
   end
