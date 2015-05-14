@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.version       = Catflap::VERSION
   spec.authors       = ["niv"]
   spec.email         = ["n@e-ix.net"]
-  spec.summary       = %q{Companion management helper to Catflap Updater UI.}
+  spec.summary       = %q{Companion management helper to catflap Updater.}
   spec.description   = ""
   spec.homepage      = "https://github.com/niv/catflap"
   spec.license       = "MIT"
