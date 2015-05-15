@@ -76,6 +76,10 @@ OptionParser.new do |opts|
     $manifest["revision"] = v
   end
 
+  opts.on("-s KEY", "--secure KEY", String, "Hash all files and sign manifest with the given GPG key.") do |v|
+    $manifest["signingKey"] = v
+  end
+
   opts.on("-v", "--version", "Show version") do
     puts Catflap::VERSION
     exit
@@ -218,7 +222,7 @@ case $command
         $stderr.puts ("Cannot refresh %s, does not exist" % sync["name"]).red
         exit 1
       end
-      upd = update_sync_item "./", sync["name"] if sync["type"] != "delete"
+      upd = update_sync_item("./", sync["name"], nil, $manifest["signingKey"] != nil) if sync["type"] != "delete"
 
       if sync["type"] != "delete" && !compare_sync(upd, sync)
         $stderr.puts "Refreshed #{sync["name"]}".green
@@ -256,7 +260,7 @@ case $command
       end
 
       $stderr.puts "Adding #{a}".green
-      $manifest["sync"] << update_sync_item("./", a, f)
+      $manifest["sync"] << update_sync_item("./", a, f, $manifest["signingKey"] != nil)
     end
 
   when "rm"
@@ -322,9 +326,27 @@ else
   $stderr.puts "Repository is currently locked.".red
 end
 
-if FileTest.exists?("catflap.json") && $manifest.hash != $manifest_original_hash
+manifestChanged = $manifest.hash != $manifest_original_hash
+
+if FileTest.exists?("catflap.json")
+  if manifestChanged
     $manifest["revision"] += 1 if $manifest["revision"].is_a?(Integer)
     File.open("catflap.json", "w") {|f| f.write(JSON.pretty_generate($manifest))}
+
     $stderr.puts ""
     $stderr.puts "Manifest written.".green
+  end
+
+  sigOutdated = $manifest["signingKey"] && (
+      !FileTest.exists?("catflap.json.sig") ||
+        File.mtime("catflap.json") > File.mtime("catflap.json.sig")
+    )
+
+  if sigOutdated
+    `gpg --batch --yes --default-key #{$manifest["signingKey"]} --detach-sign catflap.json`
+    File.utime(File.atime("catflap.json.sig"),
+      File.mtime("catflap.json"),
+      "catflap.json", "catflap.json.sig")
+    $stderr.puts "Manifest signed.".green
+  end
 end
