@@ -80,6 +80,7 @@ module Catflap
     sync.delete("csize")
 
     if current && sync != current
+      sync["revision"] ||= 0
       sync["revision"] += 1
     end
 
