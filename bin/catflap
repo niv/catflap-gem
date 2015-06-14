@@ -164,7 +164,7 @@ case $command
           "?"
       end
 
-      filestr = if FileTest.directory?(sync["name"])
+      filestr = if sync["type"] != "delete" && FileTest.directory?(sync["name"])
         "%-#{screen_width - 50 - 14}s (%d files)" % [sync["name"], sync["count"]]
       else
         sync["name"]
