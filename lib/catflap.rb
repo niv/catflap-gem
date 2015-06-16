@@ -92,6 +92,8 @@ module Catflap
           select {|x| FileTest.file?(x)}.
           map {|x| Pathname.new(x).cleanpath.to_s }
 
+        $stderr.puts "Hashing #{sync["name"]}. Please be patient."
+
         hashes =  `md5sum #{files_to_hash.map {|fn| Shellwords.shellescape(fn) }.join(' ')}`
         $? == 0 or fail "md5sum failed, ERROR"
 

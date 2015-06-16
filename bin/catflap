@@ -76,8 +76,8 @@ OptionParser.new do |opts|
     $manifest["revision"] = v
   end
 
-  opts.on("-s KEY", "--secure KEY", String, "Hash all files and sign manifest with the given GPG key.") do |v|
-    $manifest["signingKey"] = v
+  opts.on("-s", "--signed", String, "Flag the repository as signed. This will hash all files. It's up to you to sign the repository.") do |v|
+    $manifest["signed"] = true
   end
 
   opts.on("-v", "--version", "Show version") do
@@ -222,7 +222,7 @@ case $command
         $stderr.puts ("Cannot refresh %s, does not exist" % sync["name"]).red
         exit 1
       end
-      upd = update_sync_item("./", sync["name"], nil, $manifest["signingKey"] != nil) if sync["type"] != "delete"
+      upd = update_sync_item("./", sync["name"], nil, $manifest["signed"] != nil) if sync["type"] != "delete"
 
       if sync["type"] != "delete" && !compare_sync(upd, sync)
         $stderr.puts "Refreshed #{sync["name"]}".green
@@ -260,7 +260,7 @@ case $command
       end
 
       $stderr.puts "Adding #{a}".green
-      $manifest["sync"] << update_sync_item("./", a, f, $manifest["signingKey"] != nil)
+      $manifest["sync"] << update_sync_item("./", a, f, $manifest["signed"] != nil)
     end
 
   when "rm"
@@ -337,16 +337,14 @@ if FileTest.exists?("catflap.json")
     $stderr.puts "Manifest written.".green
   end
 
-  sigOutdated = $manifest["signingKey"] && (
+  sigOutdated = $manifest["signed"] && (
       !FileTest.exists?("catflap.json.sig") ||
         File.mtime("catflap.json") > File.mtime("catflap.json.sig")
     )
 
   if sigOutdated
-    `gpg --batch --yes --default-key #{$manifest["signingKey"]} --detach-sign catflap.json`
-    File.utime(File.atime("catflap.json.sig"),
-      File.mtime("catflap.json"),
-      "catflap.json", "catflap.json.sig")
-    $stderr.puts "Manifest signed.".green
+
+    $stderr.puts "\n\nSIGNATURE OUTDATED. SIGN THE REPOSITORY.".red
+
   end
 end
