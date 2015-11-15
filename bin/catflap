@@ -330,6 +330,7 @@ manifestChanged = $manifest.hash != $manifest_original_hash
 
 if FileTest.exists?("catflap.json")
   if manifestChanged
+    $manifest["timestamp"] = Time.now.to_i
     $manifest["revision"] += 1 if $manifest["revision"].is_a?(Integer)
     File.open("catflap.json", "w") {|f| f.write(JSON.pretty_generate($manifest))}
 
