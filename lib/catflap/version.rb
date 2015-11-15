@@ -1,3 +1,3 @@
 module Catflap
-  VERSION = "1.6.6"
+  VERSION = "1.7.6"
 end
