@@ -231,6 +231,11 @@ case $command
       upd || sync
     end
 
+    $stderr.puts "Updating .rsyncsums files. Please be patient."
+    if !system("rsyncsums", "-v", "-m", "strict", "-r", ".")
+      $stderr.puts "rsync failed. You NEED to fix this.".red
+    end
+
     $stderr.puts "Refresh OK.".light_green
 
 
