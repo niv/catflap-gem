@@ -217,27 +217,29 @@ case $command
 
   when "refresh"
     # Go through all sync items, update their data.
-    $manifest["sync"].map! do |sync|
-      if !FileTest.exists?(sync["name"]) && sync["type"] != "delete"
-        $stderr.puts ("Cannot refresh %s, does not exist" % sync["name"]).red
-        exit 1
-      end
-      upd = update_sync_item("./", sync["name"], nil, $manifest["signed"] != nil) if sync["type"] != "delete"
-
-      if sync["type"] != "delete" && !compare_sync(upd, sync)
-        $stderr.puts "Refreshed #{sync["name"]}".green
-      end
-
-      upd || sync
-    end
 
     $stderr.puts "Updating .rsyncsums files. Please be patient."
     if !system("rsyncsums", "-v", "-m", "strict", "-r", ".")
       $stderr.puts "rsync failed. You NEED to fix this.".red
+
+    else
+
+      $manifest["sync"].map! do |sync|
+        if !FileTest.exists?(sync["name"]) && sync["type"] != "delete"
+          $stderr.puts ("Cannot refresh %s, does not exist" % sync["name"]).red
+          exit 1
+        end
+        upd = update_sync_item("./", sync["name"], nil, $manifest["signed"] != nil) if sync["type"] != "delete"
+
+        if sync["type"] != "delete" && !compare_sync(upd, sync)
+          $stderr.puts "Refreshed #{sync["name"]}".green
+        end
+
+        upd || sync
+      end
+
+      $stderr.puts "Refresh OK.".light_green
     end
-
-    $stderr.puts "Refresh OK.".light_green
-
 
   when "init"
     # initialize new repository.
